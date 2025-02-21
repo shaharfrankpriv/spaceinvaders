@@ -53,6 +53,44 @@ player_img = load_image("player.png", (SHIP_SIZE, SHIP_SIZE))
 invader_img = load_image("invader.png", (INVADER_SIZE, INVADER_SIZE))
 
 
+def move_player(current_x, move_right):
+    """
+    TODO: Implement this function!
+
+    This function should move the player ship left and right across the screen.
+    When the ship reaches the screen edge, it should change direction.
+
+    Parameters:
+        current_x: The current x position of the player ship
+        move_right: Boolean indicating if the ship is currently moving right
+
+    Returns:
+        tuple: (new_x, new_move_right)
+        - new_x: The new x position of the player ship
+        - new_move_right: The new direction (True for right, False for left)
+
+    Hints:
+    1. Use PLAYER_SPEED to move the ship
+    2. Check if the ship hits the screen edges (0 or SCREEN_WIDTH - SHIP_SIZE)
+    3. Return both the new position and direction
+    """
+    # Your code goes here!
+    # For now, we'll provide a basic implementation
+    new_x = current_x
+    new_move_right = move_right
+
+    if move_right:
+        new_x += PLAYER_SPEED
+        if new_x >= SCREEN_WIDTH - SHIP_SIZE:
+            new_move_right = False
+    else:
+        new_x -= PLAYER_SPEED
+        if new_x <= 0:
+            new_move_right = True
+
+    return new_x, new_move_right
+
+
 def draw_invaders(invaders):
     """
     Function to draw the invader ships at the top of the screen
@@ -107,15 +145,8 @@ def main():
                 pygame.quit()
                 sys.exit()
 
-        # Move the player ship from left to right and back
-        if move_right:
-            player_x += PLAYER_SPEED
-            if player_x >= SCREEN_WIDTH - SHIP_SIZE:
-                move_right = False
-        else:
-            player_x -= PLAYER_SPEED
-            if player_x <= 0:
-                move_right = True
+        # Move the player ship using the new function
+        player_x, move_right = move_player(player_x, move_right)
 
         # Clear the screen
         screen.fill(BLACK)
