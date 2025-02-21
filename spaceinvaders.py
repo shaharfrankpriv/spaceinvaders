@@ -20,6 +20,7 @@ LASER_SPEED = 7
 LASER_WIDTH = 4
 LASER_HEIGHT = 15
 LASER_COLOR = (255, 0, 0)  # Red laser
+INVADER_SPEED = 0.5  # Pixels per frame
 
 # Explosion settings
 PARTICLE_COUNT = 15
@@ -31,11 +32,17 @@ VICTORY_PARTICLE_COUNT = 50
 VICTORY_DURATION = 180  # 3 seconds at 60 FPS
 VICTORY_COLORS = [(255, 215, 0), (218, 165, 32), (255, 255, 0)]  # Gold colors
 
+# Game Over settings
+GAME_OVER_PARTICLE_COUNT = 50
+GAME_OVER_DURATION = 180  # 3 seconds at 60 FPS
+GAME_OVER_COLORS = [(255, 0, 0), (200, 0, 0), (150, 0, 0)]  # Red colors
+
 # Colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
 GOLD = (255, 223, 0)
+RED = (255, 0, 0)
 
 # Create the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -206,6 +213,69 @@ class VictoryEffect:
         return self.duration > 0
 
 
+class GameOverParticle(Particle):
+    """
+    Special particle for game over effect
+    """
+
+    def __init__(self, x, y):
+        super().__init__(x, y)
+        self.color = random.choice(GAME_OVER_COLORS)
+        self.size = random.randint(3, 6)
+        speed = random.uniform(1, 3)
+        angle = random.uniform(0.75 * math.pi, 1.25 * math.pi)  # Mostly downward
+        self.dx = math.cos(angle) * speed
+        self.dy = math.sin(angle) * speed
+        self.fade_rate = 0.03
+
+    def move(self):
+        """Move the game over particle"""
+        self.x += self.dx
+        self.y += self.dy
+        self.dy += 0.1  # Add gravity effect
+        self.size = max(0, self.size - self.fade_rate)
+
+
+class GameOverEffect:
+    """
+    Special effect for game over
+    """
+
+    def __init__(self):
+        self.particles = []
+        self.duration = GAME_OVER_DURATION
+        self.create_particles()
+
+    def create_particles(self):
+        """Create game over particles across the screen"""
+        for _ in range(GAME_OVER_PARTICLE_COUNT):
+            x = random.randint(0, SCREEN_WIDTH)
+            y = random.randint(0, SCREEN_HEIGHT // 2)
+            self.particles.append(GameOverParticle(x, y))
+
+    def update(self):
+        """Update game over effect"""
+        self.duration -= 1
+        if self.duration % 10 == 0:
+            self.create_particles()
+        for particle in self.particles:
+            particle.move()
+        self.particles = [p for p in self.particles if p.size > 0]
+
+    def draw(self):
+        """Draw game over effect"""
+        for particle in self.particles:
+            particle.draw()
+        text = game_font.render("GAME OVER", True, RED)
+        text_rect = text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
+        screen.blit(text, text_rect)
+
+    @property
+    def is_active(self):
+        """Check if game over effect is still active"""
+        return self.duration > 0
+
+
 # Load images
 def load_image(name, size):
     """
@@ -360,27 +430,55 @@ def draw_player(x, y):
     screen.blit(player_img, (x, y))
 
 
-def update_game_state(invaders, victory_effect):
+def move_invaders(invaders):
     """
-    Check for win condition and update victory effect
+    Move all invaders down the screen
+    Parameters:
+        invaders: List of invader positions [x, y]
+    Returns:
+        bool: True if any invader has reached the bottom
+    """
+    reached_bottom = False
+    for invader in invaders:
+        invader[1] += INVADER_SPEED
+        if invader[1] + INVADER_SIZE >= SCREEN_HEIGHT - SHIP_SIZE - 10:
+            reached_bottom = True
+    return reached_bottom
+
+
+def update_game_state(invaders, victory_effect, game_over_effect):
+    """
+    Check for win/lose conditions and update effects
     Parameters:
         invaders: List of invader positions
         victory_effect: Current victory effect or None
+        game_over_effect: Current game over effect or None
     Returns:
-        VictoryEffect or None: Updated victory effect
+        tuple: (VictoryEffect or None, GameOverEffect or None)
     """
     # Check for victory
     if not invaders and victory_effect is None:
-        return VictoryEffect()
+        return VictoryEffect(), None
 
-    # Update existing victory effect
+    # Move invaders and check for game over
+    if invaders and game_over_effect is None:
+        if move_invaders(invaders):
+            return None, GameOverEffect()
+
+    # Update existing effects
     if victory_effect:
         victory_effect.update()
         if not victory_effect.is_active:
             pygame.quit()
             sys.exit()
 
-    return victory_effect
+    if game_over_effect:
+        game_over_effect.update()
+        if not game_over_effect.is_active:
+            pygame.quit()
+            sys.exit()
+
+    return victory_effect, game_over_effect
 
 
 def main():
@@ -395,6 +493,7 @@ def main():
     lasers = []
     explosions = []
     victory_effect = None
+    game_over_effect = None
 
     # Game loop
     clock = pygame.time.Clock()
@@ -411,8 +510,8 @@ def main():
         # Move the player ship using the new function
         player_x, move_right = move_player(player_x, move_right)
 
-        # Only shoot if game is not won
-        if not victory_effect:
+        # Only shoot if game is not over
+        if not victory_effect and not game_over_effect:
             shoot_delay += 1
             if shoot_delay >= 30:  # Shoot every 30 frames (about 0.5 seconds)
                 lasers.append(fire_laser(player_x, player_y))
@@ -424,8 +523,8 @@ def main():
         # Update explosions
         explosions = update_explosions(explosions)
 
-        # Check for victory and update effects
-        victory_effect = update_game_state(invaders, victory_effect)
+        # Check for victory/game over and update effects
+        victory_effect, game_over_effect = update_game_state(invaders, victory_effect, game_over_effect)
 
         # Clear the screen
         screen.fill(BLACK)
@@ -442,9 +541,11 @@ def main():
         for explosion in explosions:
             explosion.draw()
 
-        # Draw victory effect if active
+        # Draw victory/game over effect if active
         if victory_effect:
             victory_effect.draw()
+        if game_over_effect:
+            game_over_effect.draw()
 
         # Update the display
         pygame.display.flip()
