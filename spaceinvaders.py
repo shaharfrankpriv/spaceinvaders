@@ -15,6 +15,10 @@ INVADER_ROWS = 3
 INVADERS_PER_ROW = 8
 INVADER_SPACING = 60
 PLAYER_SPEED = 5
+LASER_SPEED = 7
+LASER_WIDTH = 4
+LASER_HEIGHT = 15
+LASER_COLOR = (255, 0, 0)  # Red laser
 
 # Colors
 BLACK = (0, 0, 0)
@@ -24,6 +28,43 @@ GREEN = (0, 255, 0)
 # Create the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Space Invaders - Learning Python!")
+
+
+class Laser:
+    """
+    Class representing a laser shot
+    This is a good example of object-oriented programming for your son
+    """
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.active = True
+
+    def move(self):
+        """Move the laser up the screen"""
+        self.y -= LASER_SPEED
+        # Deactivate if it goes off screen
+        if self.y < 0:
+            self.active = False
+
+    def draw(self):
+        """Draw the laser on the screen"""
+        if self.active:
+            pygame.draw.rect(screen, LASER_COLOR, (self.x, self.y, LASER_WIDTH, LASER_HEIGHT))
+
+    def check_collision(self, invader_x, invader_y):
+        """
+        Check if the laser has hit an invader
+        Returns True if there's a collision, False otherwise
+        """
+        if not self.active:
+            return False
+
+        # Simple rectangle collision detection
+        laser_rect = pygame.Rect(self.x, self.y, LASER_WIDTH, LASER_HEIGHT)
+        invader_rect = pygame.Rect(invader_x, invader_y, INVADER_SIZE, INVADER_SIZE)
+        return laser_rect.colliderect(invader_rect)
 
 
 # Load images
@@ -91,6 +132,44 @@ def move_player(current_x, move_right):
     return new_x, new_move_right
 
 
+def fire_laser(player_x, player_y):
+    """
+    Create a new laser shot from the player's position
+    Parameters:
+        player_x: x-position of the player
+        player_y: y-position of the player
+    Returns:
+        Laser: A new laser object
+    """
+    # Center the laser on the player ship
+    laser_x = player_x + (SHIP_SIZE // 2) - (LASER_WIDTH // 2)
+    return Laser(laser_x, player_y)
+
+
+def update_lasers(lasers, invaders):
+    """
+    Update all active lasers and check for collisions
+    Parameters:
+        lasers: List of active laser objects
+        invaders: List of invader positions
+    Returns:
+        list: Updated list of invaders (with hit invaders removed)
+    """
+    # Move all active lasers
+    for laser in lasers:
+        if laser.active:
+            laser.move()
+            # Check for collisions with invaders
+            for invader in invaders[:]:  # Create a copy to iterate over
+                if laser.check_collision(invader[0], invader[1]):
+                    laser.active = False  # Deactivate the laser
+                    invaders.remove(invader)  # Remove the hit invader
+                    break
+
+    # Remove inactive lasers
+    return [laser for laser in lasers if laser.active]
+
+
 def draw_invaders(invaders):
     """
     Function to draw the invader ships at the top of the screen
@@ -134,9 +213,13 @@ def main():
     # Create invaders
     invaders = create_invaders()
 
+    # List to store active lasers
+    lasers = []
+
     # Game loop
     clock = pygame.time.Clock()
     move_right = True
+    shoot_delay = 0  # Counter for controlling shooting rate
 
     while True:
         # Event handling
@@ -148,6 +231,15 @@ def main():
         # Move the player ship using the new function
         player_x, move_right = move_player(player_x, move_right)
 
+        # Automatic shooting with delay
+        shoot_delay += 1
+        if shoot_delay >= 30:  # Shoot every 30 frames (about 0.5 seconds)
+            lasers.append(fire_laser(player_x, player_y))
+            shoot_delay = 0
+
+        # Update lasers and check collisions
+        lasers = update_lasers(lasers, invaders)
+
         # Clear the screen
         screen.fill(BLACK)
 
@@ -156,6 +248,10 @@ def main():
 
         # Draw player
         draw_player(player_x, player_y)
+
+        # Draw active lasers
+        for laser in lasers:
+            laser.draw()
 
         # Update the display
         pygame.display.flip()
