@@ -2,6 +2,7 @@ import pygame
 import sys
 import random
 import os
+import math
 
 # Initialize Pygame
 pygame.init()
@@ -19,6 +20,11 @@ LASER_SPEED = 7
 LASER_WIDTH = 4
 LASER_HEIGHT = 15
 LASER_COLOR = (255, 0, 0)  # Red laser
+
+# Explosion settings
+PARTICLE_COUNT = 15
+EXPLOSION_DURATION = 30  # frames
+EXPLOSION_COLORS = [(255, 200, 0), (255, 150, 0), (255, 100, 0)]  # Orange-yellow colors
 
 # Colors
 BLACK = (0, 0, 0)
@@ -65,6 +71,61 @@ class Laser:
         laser_rect = pygame.Rect(self.x, self.y, LASER_WIDTH, LASER_HEIGHT)
         invader_rect = pygame.Rect(invader_x, invader_y, INVADER_SIZE, INVADER_SIZE)
         return laser_rect.colliderect(invader_rect)
+
+
+class Particle:
+    """
+    A single particle in the explosion effect
+    """
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        # Random speed and direction
+        angle = random.uniform(0, 2 * math.pi)
+        speed = random.uniform(2, 5)
+        self.dx = math.cos(angle) * speed
+        self.dy = math.sin(angle) * speed
+        self.size = random.randint(2, 4)
+        self.color = random.choice(EXPLOSION_COLORS)
+
+    def move(self):
+        """Move the particle"""
+        self.x += self.dx
+        self.y += self.dy
+        self.size = max(0, self.size - 0.1)  # Gradually shrink
+
+    def draw(self):
+        """Draw the particle"""
+        if self.size > 0:
+            pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), int(self.size))
+
+
+class Explosion:
+    """
+    Class representing an explosion effect
+    This demonstrates particle systems and animation
+    """
+
+    def __init__(self, x, y):
+        self.particles = [Particle(x + INVADER_SIZE // 2, y + INVADER_SIZE // 2) for _ in range(PARTICLE_COUNT)]
+        self.duration = EXPLOSION_DURATION
+
+    def update(self):
+        """Update explosion state"""
+        self.duration -= 1
+        for particle in self.particles:
+            particle.move()
+
+    def draw(self):
+        """Draw all particles"""
+        for particle in self.particles:
+            particle.draw()
+
+    @property
+    def is_active(self):
+        """Check if explosion is still active"""
+        return self.duration > 0
 
 
 # Load images
@@ -146,12 +207,13 @@ def fire_laser(player_x, player_y):
     return Laser(laser_x, player_y)
 
 
-def update_lasers(lasers, invaders):
+def update_lasers(lasers, invaders, explosions):
     """
     Update all active lasers and check for collisions
     Parameters:
         lasers: List of active laser objects
         invaders: List of invader positions
+        explosions: List of active explosions
     Returns:
         list: Updated list of invaders (with hit invaders removed)
     """
@@ -163,11 +225,26 @@ def update_lasers(lasers, invaders):
             for invader in invaders[:]:  # Create a copy to iterate over
                 if laser.check_collision(invader[0], invader[1]):
                     laser.active = False  # Deactivate the laser
+                    # Create explosion at invader position
+                    explosions.append(Explosion(invader[0], invader[1]))
                     invaders.remove(invader)  # Remove the hit invader
                     break
 
     # Remove inactive lasers
     return [laser for laser in lasers if laser.active]
+
+
+def update_explosions(explosions):
+    """
+    Update and remove finished explosions
+    Parameters:
+        explosions: List of active explosions
+    Returns:
+        list: Updated list of active explosions
+    """
+    for explosion in explosions:
+        explosion.update()
+    return [exp for exp in explosions if exp.is_active]
 
 
 def draw_invaders(invaders):
@@ -213,8 +290,9 @@ def main():
     # Create invaders
     invaders = create_invaders()
 
-    # List to store active lasers
+    # List to store active lasers and explosions
     lasers = []
+    explosions = []
 
     # Game loop
     clock = pygame.time.Clock()
@@ -238,7 +316,10 @@ def main():
             shoot_delay = 0
 
         # Update lasers and check collisions
-        lasers = update_lasers(lasers, invaders)
+        lasers = update_lasers(lasers, invaders, explosions)
+
+        # Update explosions
+        explosions = update_explosions(explosions)
 
         # Clear the screen
         screen.fill(BLACK)
@@ -252,6 +333,10 @@ def main():
         # Draw active lasers
         for laser in lasers:
             laser.draw()
+
+        # Draw active explosions
+        for explosion in explosions:
+            explosion.draw()
 
         # Update the display
         pygame.display.flip()
