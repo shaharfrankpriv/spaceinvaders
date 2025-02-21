@@ -26,14 +26,24 @@ PARTICLE_COUNT = 15
 EXPLOSION_DURATION = 30  # frames
 EXPLOSION_COLORS = [(255, 200, 0), (255, 150, 0), (255, 100, 0)]  # Orange-yellow colors
 
+# Victory settings
+VICTORY_PARTICLE_COUNT = 50
+VICTORY_DURATION = 180  # 3 seconds at 60 FPS
+VICTORY_COLORS = [(255, 215, 0), (218, 165, 32), (255, 255, 0)]  # Gold colors
+
 # Colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
+GOLD = (255, 223, 0)
 
 # Create the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Space Invaders - Learning Python!")
+
+# Initialize font
+pygame.font.init()
+game_font = pygame.font.SysFont("Arial", 64)
 
 
 class Laser:
@@ -125,6 +135,74 @@ class Explosion:
     @property
     def is_active(self):
         """Check if explosion is still active"""
+        return self.duration > 0
+
+
+class VictoryParticle(Particle):
+    """
+    Special particle for victory celebration
+    Inherits from the regular Particle class
+    """
+
+    def __init__(self, x, y):
+        super().__init__(x, y)
+        self.color = random.choice(VICTORY_COLORS)
+        self.size = random.randint(3, 6)  # Bigger particles
+        speed = random.uniform(1, 3)  # Slower movement
+        angle = random.uniform(0, 2 * math.pi)
+        self.dx = math.cos(angle) * speed
+        self.dy = math.sin(angle) * speed - 2  # Add upward drift
+        self.fade_rate = 0.03  # Slower fade
+
+    def move(self):
+        """Move the victory particle"""
+        self.x += self.dx
+        self.y += self.dy
+        self.dy += 0.1  # Add gravity effect
+        self.size = max(0, self.size - self.fade_rate)
+
+
+class VictoryEffect:
+    """
+    Special effect for victory celebration
+    """
+
+    def __init__(self):
+        self.particles = []
+        self.duration = VICTORY_DURATION
+        self.create_particles()
+
+    def create_particles(self):
+        """Create victory particles across the screen"""
+        for _ in range(VICTORY_PARTICLE_COUNT):
+            x = random.randint(0, SCREEN_WIDTH)
+            y = random.randint(SCREEN_HEIGHT // 2, SCREEN_HEIGHT)
+            self.particles.append(VictoryParticle(x, y))
+
+    def update(self):
+        """Update victory effect"""
+        self.duration -= 1
+        # Add new particles periodically
+        if self.duration % 10 == 0:
+            self.create_particles()
+        # Update existing particles
+        for particle in self.particles:
+            particle.move()
+        # Remove faded particles
+        self.particles = [p for p in self.particles if p.size > 0]
+
+    def draw(self):
+        """Draw victory effect"""
+        for particle in self.particles:
+            particle.draw()
+        # Draw victory text
+        text = game_font.render("VICTORY!", True, GOLD)
+        text_rect = text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
+        screen.blit(text, text_rect)
+
+    @property
+    def is_active(self):
+        """Check if victory effect is still active"""
         return self.duration > 0
 
 
@@ -282,6 +360,29 @@ def draw_player(x, y):
     screen.blit(player_img, (x, y))
 
 
+def update_game_state(invaders, victory_effect):
+    """
+    Check for win condition and update victory effect
+    Parameters:
+        invaders: List of invader positions
+        victory_effect: Current victory effect or None
+    Returns:
+        VictoryEffect or None: Updated victory effect
+    """
+    # Check for victory
+    if not invaders and victory_effect is None:
+        return VictoryEffect()
+
+    # Update existing victory effect
+    if victory_effect:
+        victory_effect.update()
+        if not victory_effect.is_active:
+            pygame.quit()
+            sys.exit()
+
+    return victory_effect
+
+
 def main():
     # Set up the player
     player_x = SCREEN_WIDTH // 2 - SHIP_SIZE // 2
@@ -293,6 +394,7 @@ def main():
     # List to store active lasers and explosions
     lasers = []
     explosions = []
+    victory_effect = None
 
     # Game loop
     clock = pygame.time.Clock()
@@ -309,11 +411,12 @@ def main():
         # Move the player ship using the new function
         player_x, move_right = move_player(player_x, move_right)
 
-        # Automatic shooting with delay
-        shoot_delay += 1
-        if shoot_delay >= 30:  # Shoot every 30 frames (about 0.5 seconds)
-            lasers.append(fire_laser(player_x, player_y))
-            shoot_delay = 0
+        # Only shoot if game is not won
+        if not victory_effect:
+            shoot_delay += 1
+            if shoot_delay >= 30:  # Shoot every 30 frames (about 0.5 seconds)
+                lasers.append(fire_laser(player_x, player_y))
+                shoot_delay = 0
 
         # Update lasers and check collisions
         lasers = update_lasers(lasers, invaders, explosions)
@@ -321,13 +424,14 @@ def main():
         # Update explosions
         explosions = update_explosions(explosions)
 
+        # Check for victory and update effects
+        victory_effect = update_game_state(invaders, victory_effect)
+
         # Clear the screen
         screen.fill(BLACK)
 
-        # Draw invaders
+        # Draw game objects
         draw_invaders(invaders)
-
-        # Draw player
         draw_player(player_x, player_y)
 
         # Draw active lasers
@@ -337,6 +441,10 @@ def main():
         # Draw active explosions
         for explosion in explosions:
             explosion.draw()
+
+        # Draw victory effect if active
+        if victory_effect:
+            victory_effect.draw()
 
         # Update the display
         pygame.display.flip()
