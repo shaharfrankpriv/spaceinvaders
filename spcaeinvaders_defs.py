@@ -1,0 +1,36 @@
+# Constants
+SCREEN_WIDTH = 740
+SCREEN_HEIGHT = 600
+SHIP_SIZE = 40
+INVADER_SIZE = 30
+INVADER_ROWS = 3
+INVADERS_PER_ROW = 6
+INVADER_SPACING = 100
+PLAYER_SPEED = 5
+LASER_SPEED = 7
+LASER_WIDTH = 4
+LASER_HEIGHT = 15
+LASER_COLOR = (255, 0, 0)  # Red laser
+INVADER_SPEED = 0.5  # Pixels per frame
+
+# Explosion settings
+PARTICLE_COUNT = 15
+EXPLOSION_DURATION = 30  # frames
+EXPLOSION_COLORS = [(255, 200, 0), (255, 150, 0), (255, 100, 0)]  # Orange-yellow colors
+
+# Victory settings
+VICTORY_PARTICLE_COUNT = 50
+VICTORY_DURATION = 180  # 3 seconds at 60 FPS
+VICTORY_COLORS = [(255, 215, 0), (218, 165, 32), (255, 255, 0)]  # Gold colors
+
+# Game Over settings
+GAME_OVER_PARTICLE_COUNT = 50
+GAME_OVER_DURATION = 180  # 3 seconds at 60 FPS
+GAME_OVER_COLORS = [(255, 0, 0), (200, 0, 0), (150, 0, 0)]  # Red colors
+
+# Colors
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+GREEN = (0, 255, 0)
+GOLD = (255, 223, 0)
+RED = (255, 0, 0)
